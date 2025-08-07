@@ -1,0 +1,25 @@
+# used for development when we want to serve a db instance for testing
+# execute it when inside the backend folder
+# docker-compose -f docker.compose.mongo.yaml up -d
+# make sure that .env file has the "development" setup
+
+services:
+  mongo:
+    image: mongo
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - 27017:27017
+    volumes:
+      - ./db/mongoDB:/data/db #the data are saved locally in backend file directory db/mongoDB
+
+  mongo-express:
+    image: mongo-express
+    restart: always
+    ports:
+      - 8081:8081
+    env_file:
+      - .env
+
+  
