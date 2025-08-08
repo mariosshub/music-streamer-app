@@ -40,21 +40,21 @@ This app is inspired by the official Spotify app and replicates some of its core
 <div align="center">
     <table border >
      <tr>
-       <td>
-         <img height="318" width="443" src="https://github.com/user-attachments/assets/0fed6ec4-97f6-481a-9702-08197fbfb366" />
-         <img height="318" width="440" src="https://github.com/user-attachments/assets/de5ec1bd-da1e-42c7-b9f1-265ce06afa23"/>
+       <td align="center">
+         <img height="298" width="403" src="https://github.com/user-attachments/assets/0fed6ec4-97f6-481a-9702-08197fbfb366" />
+         <img height="298" width="403" src="https://github.com/user-attachments/assets/de5ec1bd-da1e-42c7-b9f1-265ce06afa23"/>
        </td> 
      </tr>
      <tr>
-      <td>
-       <img height="318" width="443" src="https://github.com/user-attachments/assets/10663b6b-1c9d-43af-8d31-bb4af13f327f"/>
-       <img height="318" width="443" src="https://github.com/user-attachments/assets/ec8f06de-374f-4d14-a4b4-b51fa9cc8502"/>
+      <td align="center">
+       <img height="298" width="403" src="https://github.com/user-attachments/assets/10663b6b-1c9d-43af-8d31-bb4af13f327f"/>
+       <img height="298" width="403" src="https://github.com/user-attachments/assets/ec8f06de-374f-4d14-a4b4-b51fa9cc8502"/>
       </td>
      </tr>
      <tr>
       <td align="center">
-       <img height="318" width="443" src="https://github.com/user-attachments/assets/70bfc56c-3886-4fb4-84b3-6f040c63d875"/>
-       <img height="318" width="443" src="https://github.com/user-attachments/assets/baddd91b-85ec-447c-8ed1-23c0a8dee778"/>
+       <img height="298" width="403"  src="https://github.com/user-attachments/assets/70bfc56c-3886-4fb4-84b3-6f040c63d875"/>
+       <img height="298" width="403" src="https://github.com/user-attachments/assets/baddd91b-85ec-447c-8ed1-23c0a8dee778"/>
       </td>
      </tr>
     </table>
