@@ -79,7 +79,7 @@ To run this project locally lets go throught the following steps:
 1. First clone this repository:
 
    ```bash
-   clone <add-your-git-repo>
+   git clone https://github.com/mariosshub/music-streamer-app.git
    ```
 
 2. Navigate to the project directory and optionally have 2 terminal windows open, so that you can operate the backend directory and the frontend directory simultaneously.
