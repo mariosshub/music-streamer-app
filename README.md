@@ -16,24 +16,24 @@ This app is inspired by the official Spotify app and replicates some of its core
  🎵 Live feed of newly uploaded songs.
 
 ## 🛠 Technologies Used
- 📙**MongoDB** : As the main database of the app. 
+ 📙 **MongoDB** : As the main database of the app. 
   
    - Mongoose : Used as an object modeling tool (ODM)
    - [GridFS](https://www.mongodb.com/docs/manual/core/gridfs/) : For storing large music files into parts, or chunks, with efficiency.
 
- 😼[NestJS](https://nestjs.com/) : For building the backend API.
+ 😼 [NestJS](https://nestjs.com/) : For building the backend API.
 
- ⚡**React+Vite** : For building the user interface.
+ ⚡ **React+Vite** : For building the user interface.
 
    - Zustand : A light state-management solution for React.
 
- 📚**Shadcn** : Library containing nice looking, customizable and reusable components for React.
+ 📚 **Shadcn** : Library containing nice looking, customizable and reusable components for React.
 
- 📱**Tailwind CSS** : For styling the components of the website.
+ 📱 **Tailwind CSS** : For styling the components of the website.
 
- 🔒**JWT Authentication**: Authentication for users login.
+ 🔒 **JWT Authentication**: Authentication for users login.
 
- 📨**Socket.IO** For realtime receiving and sending data.
+ 📨 **Socket.IO** For realtime receiving and sending data.
 
 
 ## 📸 Screenshoots
@@ -78,38 +78,38 @@ To run this project locally lets go throught the following steps:
 
 1. First clone this repository:
 
-```bash
-clone <add-your-git-repo>
-```
+   ```bash
+   clone <add-your-git-repo>
+   ```
 
 2. Navigate to the project directory and optionally have 2 terminal windows open, so that you can operate the backend directory and the frontend directory simultaneously.
-```bash
-cd backend
-
-cd frontend
-```
+   ```bash
+   cd backend
+   
+   cd frontend
+   ```
 
 3. Make sure both directories have a **.env** file created with the **development** setup.
 
 4. In the backend terminal window run the following command in order to pull a mongodb and mongo-express images, create container and host the database locally.
 
-```bash
-# \backend
-docker-compose -f docker-compose.mongo.yaml up -d
-```
+   ```bash
+   # \backend
+   docker-compose -f docker-compose.mongo.yaml up -d
+   ```
 
 5. Make sure container is up and running, install npm depedencies and run the app.
 
-```bash
-# \backend 
-npm install
-npm run start
-```
-```bash
-# \frontend 
-npm install
-npm run dev
-```
+   ```bash
+   # \backend 
+   npm install
+   npm run start
+   ```
+   ```bash
+   # \frontend 
+   npm install
+   npm run dev
+   ```
 
 ### Setup with docker (Running app in production)
 
@@ -125,10 +125,12 @@ npm run dev
     - build the React app and serve it with Nginx,
     - host a MongoDB database,
     - manage all network connections.
+      
+<br>
 
-```bash
-docker-compose up --build 
-```
+   ```bash
+   docker-compose up --build 
+   ```
 
 ## 💡Future Improvements
 <table>
@@ -158,3 +160,7 @@ Frontend
 </td>
 </tr>
 </table>
+
+## 📝 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
