@@ -1,9 +1,8 @@
-import { Body, Controller, Delete, Get, Headers, Param, Post, Put, Query, Req, Request, Res, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Request, Res, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { SongsService } from "./songs.service";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { multerOptions } from "./multer/multer.options";
 import { JwtAuthGuard } from "src/guards/jwt-auth.guard";
-import { MulterMusicFile } from "./multer/multer-file.types";
 import { UpdateSongDTO } from "./dto/update-song.dto";
 
 @Controller("songs")
@@ -61,7 +60,7 @@ export class SongsController {
     @Post('upload')
     @UseGuards(JwtAuthGuard)
     @UseInterceptors(FileInterceptor('file', multerOptions))
-    async uploadSong(@UploadedFile() file: MulterMusicFile, @Request() req, @Body() body) {
+    async uploadSong(@UploadedFile() file: Express.Multer.File, @Request() req, @Body() body) {
         return this.songsService.uploadSong(file, body, req.user.userId)  
     }
 
@@ -79,14 +78,12 @@ export class SongsController {
 
     @Get('stream/:id')
     async streamSong(@Param() id: string,@Res() res) {
-        const filestream = await this.songsService.readSongStream(id);
-        const fileInfo = await this.songsService.findSongInfo(id);
+        const {stream, contentLength} = await this.songsService.getSongStream(id);
 
         res.header({
             'Content-Type': 'audio/mpeg',
-            'Content-Length': fileInfo.length
+            'Content-Length': contentLength
         });
-        return filestream.pipe(res);
+        return stream.pipe(res);
     }
-
 }

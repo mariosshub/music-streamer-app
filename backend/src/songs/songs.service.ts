@@ -2,22 +2,19 @@ import { forwardRef, HttpException, HttpStatus, Inject, Injectable } from "@nest
 import { InjectConnection, InjectModel } from "@nestjs/mongoose";
 import { Song, SongDocument } from "./schemas/song";
 import { Connection, Model, Types } from "mongoose";
-import { MongoGridFS } from "mongo-gridfs";
-import { GridFSBucketReadStream } from "mongodb";
 import { CreateSongDTO } from "./dto/create-song.dto";
-import { MulterMusicFile } from "./multer/multer-file.types";
 import { UpdateSongDTO } from "./dto/update-song.dto";
 import { AlbumsService } from "../albums/albums.service";
 import { Comment } from "src/comments/schemas/comment";
 import { User } from "src/users/schemas/user";
 import { UploadSongFieldsDTO } from "./dto/upload-song-fields.dto";
 import { SocketService } from "src/socket/socket.service";
-import { VotesService } from "src/votes/votes.service";
-import { MostLikedSongsResponse } from "src/votes/dto/most-liked-songs";
+import { GridFSBucket } from 'mongodb';
+import { MulterMusicFile } from "./multer/multer-file.types";
 
 @Injectable()
 export class SongsService {
-    private songGridFs: MongoGridFS;
+    private bucket: GridFSBucket;
 
     constructor(
         @InjectModel(Song.name)
@@ -28,7 +25,8 @@ export class SongsService {
         private albumsService: AlbumsService,
         private socketService: SocketService
     ){
-        this.songGridFs = new MongoGridFS(this.connection.db as any, 'fs')
+        if(this.connection.db)
+            this.bucket = new GridFSBucket(this.connection.db);
     }
 
     async findAll(): Promise<Song[]> {
@@ -102,10 +100,38 @@ export class SongsService {
             .orFail(() => new HttpException("No songs found", HttpStatus.NOT_FOUND));
     }
 
-    async uploadSong(file: MulterMusicFile, body:UploadSongFieldsDTO, userId: string) {
+    async uploadFile(file: Express.Multer.File): Promise<MulterMusicFile> {
+        const uploadStream = this.bucket.openUploadStream(file.originalname, {
+            contentType: file.mimetype,
+        });
+
+        return new Promise((resolve, reject) => {
+            const bufferStream = require('stream').Readable.from(file.buffer);
+            bufferStream.pipe(uploadStream)
+                .on('error', reject)
+                .on('finish', () => {
+                resolve({
+                    id: uploadStream.id,
+                    filename: file.originalname,
+                    contentType: file.mimetype,
+                    size: file.size
+                });
+            });
+        });
+    }
+
+    async uploadSong(file: Express.Multer.File, body:UploadSongFieldsDTO, userId: string) {
         console.log('------- File Upload -------')
         console.log(file);
         let {title, releasedDate, durationInSec, album, genre} = body;
+
+        // upload the file in a bucket
+        let uploadedFile = await this.uploadFile(file)
+        
+        if(!uploadedFile){
+            throw new HttpException('No album provided', HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        console.log('file uploaded with id = ', uploadedFile.id)
 
         //check if album exists 
         if(!album || album == "0")
@@ -122,10 +148,10 @@ export class SongsService {
             artist: new Types.ObjectId(userId),
             title: title,
             releasedDate: releasedDate,
-            uploadDate: file.uploadDate.toISOString(),
+            uploadDate: new Date().toISOString(),
             durationInSec: parseInt(durationInSec),
             genre: genre,
-            uploadedSongId: file.id,
+            uploadedSongId: uploadedFile.id,
             album: albumToInsertSong._id
         }
         let songDocument = await this.songModel.create(createSongDto);
@@ -200,7 +226,11 @@ export class SongsService {
         await this.songModel.deleteOne({_id: new Types.ObjectId(songId)})
 
         // delete from bucket
-        await this.songGridFs.delete(uploadedSongId.toString());
+        try {
+            await this.bucket.delete(uploadedSongId);
+        } catch (error) {
+            throw new HttpException("File not found", HttpStatus.NOT_FOUND);
+        }
     }
 
     async deleteMultipleSongs(songArray: SongDocument[], userId:string) {
@@ -209,25 +239,36 @@ export class SongsService {
         let songIdsToDelete = songArray.map(song => song._id);
         await this.songModel.deleteMany({_id: { $in: songIdsToDelete}});
 
-        const promiseArr: Promise<boolean>[] = []
+        const promiseArr: Promise<void>[] = []
 
         // delete each song from bucket
-        songArray.forEach(song => {
-           let promise = this.songGridFs.delete(song.uploadedSongId.toString());
-           promiseArr.push(promise);
-        });
+        for(const song of songArray){
+            const promise = this.bucket.delete(song.uploadedSongId).catch(error => {
+                console.log(`Error deleting file ${song.uploadedSongId}: `, error);
+                throw new HttpException("File not found", HttpStatus.NOT_FOUND);
+            });
+            promiseArr.push(promise);
+        }
 
         return await Promise.all(promiseArr);
     }
 
-    async readSongStream(id: string): Promise<GridFSBucketReadStream> {
-        return await this.songGridFs.readFileStream(id);
-    }
+    async getSongStream(id: string) {
+        try{
+            // First get the file info to access the filename
+            const files = await this.bucket.find({ _id: new Types.ObjectId(id) }).toArray();
 
-    async findSongInfo(id: string) {
-        const fileInfo = await this.songGridFs.findById(id)
-        .catch( err => {throw new HttpException('File not found', HttpStatus.NOT_FOUND)} )
-        .then(result => result)
-        return fileInfo;
+            if (!files.length) 
+                throw new HttpException('File not found', HttpStatus.NOT_FOUND)
+
+            const downloadStream = this.bucket.openDownloadStream(new Types.ObjectId(id));
+            return {
+                stream: downloadStream,
+                contentLength: files[0].length
+            };
+        } catch (error) {
+            throw new HttpException('Error in streaming song', HttpStatus.INTERNAL_SERVER_ERROR)
+        }
     }
+    
 }
