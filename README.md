@@ -144,7 +144,6 @@ Backend
 </td>
 <td width="70%">
  
-- [ ] Update the packages used for GridFS (legacy code), or make custom code to implement all functionalities from mongoose, using latest mongodb and mongoose modules.
 - [ ] Maybe move to cloud file storage (Cloudinary).
 - [ ] Improve JWT authentication by using cookies.
 </td>
