@@ -3,23 +3,72 @@
 # docker-compose -f docker.compose.mongo.yaml up -d
 # make sure that .env file has the "development" setup
 
+# mongodb replicaset primary
 services:
-  mongo:
+  mongod1:
+    container_name: mongod1
     image: mongo
-    restart: always
-    env_file:
-      - .env
     ports:
       - 27017:27017
     volumes:
-      - ./db/mongoDB:/data/db #the data are saved locally in backend file directory db/mongoDB
+      - ./db/mongoDB1:/data/db #the data are saved locally in backend file directory db/mongoDB
+      - mongo-keyfile:/etc/mongo-keyfile
+    depends_on:
+      - mongod2
+      - mongod3
+    restart: always
+    command: ["--replSet", "dbrs", "--bind_ip_all", "--keyFile", "/etc/mongo-keyfile/mongodb-keyfile"]
+
+  # mongodb replicaset secondary
+  mongod2:
+    container_name: mongod2
+    image: mongo
+    expose:
+      - 27017
+    volumes:
+      - ./db/mongoDB2:/data/db 
+      - mongo-keyfile:/etc/mongo-keyfile
+    restart: always
+    command: ["--replSet", "dbrs", "--bind_ip_all", "--keyFile", "/etc/mongo-keyfile/mongodb-keyfile"]
+
+  # mongodb replicaset arbiter
+  mongod3:
+    container_name: mongod3
+    image: mongo
+    expose:
+      - 27017
+    volumes:
+      - ./db/mongoDB3:/data/db 
+      - mongo-keyfile:/etc/mongo-keyfile
+    restart: always
+    command: ["--replSet", "dbrs", "--bind_ip_all", "--keyFile", "/etc/mongo-keyfile/mongodb-keyfile"]
+  
+  mongo-setup:
+    image: mongo
+    container_name: mongo-setup
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    depends_on:
+      - mongod1
+      - mongod2
+      - mongod3
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:-.}/scripts/mongodb_rs_init.sh:/scripts/mongodb_rs_init.sh
+      - mongo-keyfile:/etc/mongo-keyfile
+    restart: on-failure
+    entrypoint: ["/bin/bash", "/scripts/mongodb_rs_init.sh"]
 
   mongo-express:
+    container_name: mongo-express
     image: mongo-express
     restart: always
     ports:
       - 8081:8081
-    env_file:
-      - .env
+    environment:
+      ME_CONFIG_MONGODB_URL: "mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongod1:27017/?replicaSet=dbrs"
+    depends_on:
+      - "mongod1"
 
-  
+volumes:
+  mongo-keyfile:
