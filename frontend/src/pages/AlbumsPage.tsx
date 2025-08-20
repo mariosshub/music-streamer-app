@@ -17,10 +17,11 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { mapMusicGenres } from "@/utils/mapMusicGenres";
 import { useAudioPlayerStore } from "@/stores/useAudioPlayerStore";
 import { useIsSmallScreen } from "@/hooks/useIsSmallScreen";
+import { EditSongModel } from "@/models/Song";
 
 const AlbumsPage = () => {
   const {albumId} = useParams();
-  const {fetchAlbumByIdPopulatedSongs, currentAlbum, albumSongs, isLoading, errorMessage} = useMusicStore();
+  const {fetchAlbumByIdPopulatedSongs, fetchUsersAlbums, currentAlbum, albumSongs, isLoading, errorMessage} = useMusicStore();
   const {currentSong, isPlaying, playAlbum, togglePlay} = useAudioPlayerStore();
   const {loggedInUser} = useAuth();
   const isSmallScreen = useIsSmallScreen();
@@ -57,6 +58,21 @@ const AlbumsPage = () => {
   const handlePlaySong = (index: number) => {
     if(!currentAlbum) return;
     playAlbum(albumSongs, index);
+  }
+
+  const updateSongDetails = (editedSong: EditSongModel) => {
+    if(albumId) {
+      // check if song moved to other album
+      if(albumId !== editedSong.album){
+        // update the album list
+        fetchUsersAlbums();
+        // update the current album
+        fetchAlbumByIdPopulatedSongs(albumId);
+      }
+      else{
+        fetchAlbumByIdPopulatedSongs(albumId)
+      }
+    }
   }
 
   if(isLoading){
@@ -227,7 +243,7 @@ const AlbumsPage = () => {
                             <div onClick={e => {e.stopPropagation()}}>
                               <Tooltip>
                                 <TooltipTrigger className="cursor-pointer">
-                                  <EditSongDialog song={song} albumId={albumId}>
+                                  <EditSongDialog song={song} updateSongDetails={updateSongDetails}>
                                     <Edit2 onClick={e => {e.stopPropagation()}} className="size-4 hover:animate-pulse" color="blue" fill="blue" />
                                   </EditSongDialog>
                                 </TooltipTrigger>
