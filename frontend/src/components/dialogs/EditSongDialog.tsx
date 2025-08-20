@@ -15,11 +15,11 @@ import { musicGenres } from "@/utils/music-genres.data";
 
 export type Props = {
   song: SongModel | SongWithCommentsModel,
-  albumId: string | undefined;
+  updateSongDetails: (editedSong: EditSongModel) => void
 }
 
-const EditSongDialog = ({song, albumId, children}:PropsWithChildren<Props>) => {
-  const {albums, fetchAlbumByIdPopulatedSongs, fetchUsersAlbums } = useMusicStore();
+const EditSongDialog = ({song, updateSongDetails, children}:PropsWithChildren<Props>) => {
+  const {albums} = useMusicStore();
   const [songDialogOpen, setSongDialogOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const {toastSuccess, toastErrorApi} =  useCustomizedToast();
@@ -83,16 +83,7 @@ const EditSongDialog = ({song, albumId, children}:PropsWithChildren<Props>) => {
       await axiosInstance.put(`/songs/${song._id}`, editSongModel);
       setSongDialogOpen(false);
       toastSuccess("Song edited!")
-      // check if song moved to other album
-      if(song.album !== editSongModel.album){
-        fetchUsersAlbums();
-        if(albumId)
-          fetchAlbumByIdPopulatedSongs(albumId);
-      }
-      else{
-        if(albumId)
-          fetchAlbumByIdPopulatedSongs(albumId)
-      }
+      updateSongDetails(editSongModel)
     } catch (error: any) {
       toastErrorApi(error)
     }

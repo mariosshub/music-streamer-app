@@ -17,7 +17,7 @@ import { formatTime } from "@/utils/formatTime";
 
 const SongsPage = () => {
   const {songId} = useParams();
-  const {fetchSongWithComments, songWithComments, commentsLimitedTo4, isLoading, errorMessage, 
+  const {fetchSongWithComments, editSongDetails, songWithComments, commentsLimitedTo4, isLoading, errorMessage, 
     increaseSongVotes, decreaseSongVotes} = useSongCommentsStore();
   const {userHasVoted, isVotesLoading, updatingVotes, errorMessageVotes, addVote, removeVote, fetchHasVoted} = useVotesStore();
   const {loggedInUser} = useAuth();
@@ -124,7 +124,7 @@ const SongsPage = () => {
               </ul>
               <div className="self-end flex gap-4 text-s">
                 {isSongOwner() && songWithComments &&
-                  <EditSongDialog song={songWithComments} albumId={songWithComments?.album}>
+                  <EditSongDialog song={songWithComments} updateSongDetails={editSongDetails}>
                         <span className="cursor-pointer text-blue-600 hover:underline">Edit song</span>
                   </EditSongDialog>
                 }
