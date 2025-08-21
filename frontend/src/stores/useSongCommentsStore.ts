@@ -1,6 +1,6 @@
 import { axiosInstance } from "@/lib/axios";
 import { CommentsModel } from "@/models/Comments";
-import { SongWithCommentsModel } from "@/models/Song";
+import { EditSongModel, SongWithCommentsModel } from "@/models/Song";
 import { create } from "./storeCreator";
 
 type SongCommentsStore = {
@@ -10,6 +10,7 @@ type SongCommentsStore = {
   errorMessage: string | null,
 
   fetchSongWithComments: (songId: string) => Promise<void>,
+  editSongDetails: (editedSong: EditSongModel) => void,
   setReceivedComments: (comment: CommentsModel) => void,
   increaseSongVotes: () => void,
   decreaseSongVotes: () => void
@@ -39,6 +40,20 @@ export const useSongCommentsStore = create<SongCommentsStore>()(set => ({
     } finally {
       set({isLoading: false});
     }
+  },
+
+  editSongDetails: (editedSong: EditSongModel) => {
+    set(state => ({
+      songWithComments: state.songWithComments ? 
+      {
+        ...state.songWithComments, 
+        releasedDate:editedSong.releasedDate.toISOString(), 
+        album: editedSong.album, 
+        genre: editedSong.genre
+      }
+      :
+      state.songWithComments
+    }))
   },
 
   setReceivedComments: (comment: CommentsModel) => {
