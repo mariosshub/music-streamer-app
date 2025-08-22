@@ -214,19 +214,22 @@ export class SongsService {
         return await songToUpdate.save();
     }
 
-    async updateSongComments(songId: string, commentId: Types.ObjectId) {
+    async updateSongComments(songId: string, commentId: Types.ObjectId, session: ClientSession) {
         return await this.songModel.updateOne(
             {_id: new Types.ObjectId(songId)},
-            {$push: {comments: commentId}}
-        )
+            {$push: {comments: commentId}},
+            {session}
+        ).orFail(new HttpException("No song found to update comments", HttpStatus.NOT_FOUND))
     }
 
-    async increaseSongVotes(songId: string) {
-        return await this.songModel.findByIdAndUpdate(new Types.ObjectId(songId), {$inc: {votes: 1}})
+    async increaseSongVotes(songId: string, session: ClientSession) {
+        return await this.songModel.findByIdAndUpdate(new Types.ObjectId(songId), {$inc: {votes: 1}}, {session})
+            .orFail(new HttpException("No song found to increase song votes", HttpStatus.NOT_FOUND))
     }
 
-    async decreaseSongVotes(songId: string) {
-        return await this.songModel.findByIdAndUpdate(new Types.ObjectId(songId), {$inc: {votes: -1}})
+    async decreaseSongVotes(songId: string, session: ClientSession) {
+        return await this.songModel.findByIdAndUpdate(new Types.ObjectId(songId), {$inc: {votes: -1}}, {session})
+            .orFail(new HttpException("No song found to decrease song votes", HttpStatus.NOT_FOUND))
     }
 
     async deleteSong(songId: string, userId: string) {
