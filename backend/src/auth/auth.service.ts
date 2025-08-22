@@ -6,15 +6,18 @@ import { PayloadType } from "./types/payload.type";
 import { JwtService } from "@nestjs/jwt";
 import { CreateUserDTO } from "src/users/dto/create-user.dto";
 import { ConfigService } from "@nestjs/config";
-import { Types } from "mongoose";
+import { Connection, Types } from "mongoose";
 import { UserDocument } from "src/users/schemas/user";
 import { AuthResponseType } from "./dto/authResponseType";
 import { AlbumsService } from "src/albums/albums.service";
+import { InjectConnection } from "@nestjs/mongoose";
 
 @Injectable()
 export class AuthService {
 
     constructor(
+        @InjectConnection()
+        private readonly connection: Connection,
         private jwtService: JwtService,
         private configService: ConfigService,
         private usersService: UsersService,
@@ -29,18 +32,32 @@ export class AuthService {
         // hash the password and save the user
         const salt = await bcrypt.genSalt();
         createUserDto.password = await bcrypt.hash(createUserDto.password, salt);
-        const newUser = await this.usersService.create(createUserDto);
 
-        //create default album for user on signup
-        await this.albumsService.createDefaultAlbum(newUser._id.toString())
-        
-        let tokens = await this.createPayloadAndTokens(newUser);
-        return {
-            accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken,
-            id: newUser._id.toString(),
-            username: newUser.username,
-            email: newUser.email
+        const session = await this.connection.startSession();
+        try {
+            session.startTransaction();
+
+            const newUser = await this.usersService.create(createUserDto, session);
+
+            //create default album for user on signup
+            await this.albumsService.createDefaultAlbum(newUser._id.toString(), session)
+            
+            let tokens = await this.createPayloadAndTokens(newUser);
+
+            await session.commitTransaction();
+            
+            return {
+                accessToken: tokens.accessToken,
+                refreshToken: tokens.refreshToken,
+                id: newUser._id.toString(),
+                username: newUser.username,
+                email: newUser.email
+            }
+        } catch (error) {
+            await session.abortTransaction();
+            throw error
+        } finally {
+            session.endSession()
         }
     }
 
