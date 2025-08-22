@@ -1,7 +1,7 @@
 import { forwardRef, HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
-import { InjectModel } from "@nestjs/mongoose";
+import { InjectConnection, InjectModel } from "@nestjs/mongoose";
 import { Album, AlbumDocument } from "./schemas/album";
-import { Model, Types } from "mongoose";
+import { ClientSession, Connection, Model, Types } from "mongoose";
 import { CreateAlbumDTO } from "./dto/create-album.dto";
 import { Song, SongDocument } from "src/songs/schemas/song";
 import { UpdateAlbumSongsDTO } from "./dto/update-album-songs.dto";
@@ -14,6 +14,8 @@ export class AlbumsService {
     constructor(
         @InjectModel(Album.name)
         private readonly albumModel: Model<AlbumDocument>,
+        @InjectConnection()
+        private readonly connection: Connection,
         // used forward reference to solve circular depedency
         @Inject(forwardRef(() => SongsService))
         private songsService: SongsService
@@ -87,18 +89,28 @@ export class AlbumsService {
         ).orFail(new HttpException('Album not found', HttpStatus.NOT_FOUND));
     }
 
-    async updateSongsArray (album: AlbumDocument, songId: Types.ObjectId) {
-       return await this.albumModel.updateOne(
+    async updateSongsArray (album: AlbumDocument, songId: Types.ObjectId, session: ClientSession) {
+       let result = await this.albumModel.updateOne(
             {_id: album._id},
-            {$push: {songs: songId}}
-        )
+            {$push: {songs: songId}},
+            {session}
+        ).orFail(new HttpException('Album not found', HttpStatus.NOT_FOUND));
+
+        if(result.modifiedCount === 0) 
+            throw new HttpException('Error inserting song to album', HttpStatus.INTERNAL_SERVER_ERROR)
+        return result;
     }
 
-    async deleteAlbumsSong (songId: string, albumId: Types.ObjectId) {
-        return await this.albumModel.updateOne(
+    async deleteAlbumsSong (songId: string, albumId: Types.ObjectId, session: ClientSession) {
+        let result = await this.albumModel.updateOne(
             {_id: albumId},
-            {$pull: {songs: new Types.ObjectId(songId)}}
-        );
+            {$pull: {songs: new Types.ObjectId(songId)}},
+            {session}
+        ).orFail(new HttpException('Album not found', HttpStatus.NOT_FOUND));
+
+         if(result.modifiedCount === 0) 
+            throw new HttpException('No song found to delete from album', HttpStatus.NOT_FOUND)
+        return result;
     }
 
     // deletes the album and the songs that belong to it permenately
@@ -111,12 +123,23 @@ export class AlbumsService {
                 isDefault: {$ne: true}
         }).populate<{songs: SongDocument[]}>('songs')
         .orFail(new HttpException('Album not found or tried to delete default album', HttpStatus.NOT_FOUND));
-        
-        // delete each song
-        await this.songsService.deleteMultipleSongs(albumToDelete.songs, userId);
 
-        // delete the album
-        await this.albumModel.deleteOne({_id: albumToDelete._id});
+        const session = await this.connection.startSession();
+        try {
+            session.startTransaction();
+            // delete each song
+            await this.songsService.deleteMultipleSongs(albumToDelete.songs, session);
+
+            // delete the album
+            await this.albumModel.deleteOne({_id: albumToDelete._id}, {session});
+            await session.commitTransaction();
+        } catch (error) {
+            await session.abortTransaction();
+            throw error
+
+        } finally {
+            session.endSession();
+        }
     }
 
     async getAlbumPopulateSongs (albumId: string) {
