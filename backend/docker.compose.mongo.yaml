@@ -10,6 +10,8 @@ services:
     image: mongo
     ports:
       - 27017:27017
+    env_file:
+      - .env
     volumes:
       - ./db/mongoDB1:/data/db #the data are saved locally in backend file directory db/mongoDB
       - mongo-keyfile:/etc/mongo-keyfile
@@ -46,15 +48,14 @@ services:
   mongo-setup:
     image: mongo
     container_name: mongo-setup
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    env_file:
+      - .env
     depends_on:
       - mongod1
       - mongod2
       - mongod3
     volumes:
-      - ${DOCKER_VOLUME_DIRECTORY:-.}/scripts/mongodb_rs_init.sh:/scripts/mongodb_rs_init.sh
+      - ./scripts/mongodb_rs_init.sh:/scripts/mongodb_rs_init.sh
       - mongo-keyfile:/etc/mongo-keyfile
     restart: on-failure
     entrypoint: ["/bin/bash", "/scripts/mongodb_rs_init.sh"]
@@ -65,8 +66,8 @@ services:
     restart: always
     ports:
       - 8081:8081
-    environment:
-      ME_CONFIG_MONGODB_URL: "mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongod1:27017/?replicaSet=dbrs"
+    env_file:
+      - .env
     depends_on:
       - "mongod1"
 

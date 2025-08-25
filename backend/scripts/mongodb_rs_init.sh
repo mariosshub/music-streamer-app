@@ -5,6 +5,7 @@ m3=mongod3
 port=27017
 KEYFILE=/etc/mongo-keyfile/mongodb-keyfile
 
+
 # Create cluster keyfile (required when using authentication and replica-set)
 if [ ! -f ${KEYFILE} ]; then
     openssl rand -base64 756 > ${KEYFILE}
