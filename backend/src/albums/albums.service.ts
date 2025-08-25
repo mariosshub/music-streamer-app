@@ -49,18 +49,18 @@ export class AlbumsService {
     }
 
     // create a default album when user signs in if not exists
-    async createDefaultAlbum (userId: string, session: ClientSession): Promise<void> {
+    async createDefaultAlbum (userId: string): Promise<void> {
        let defaultAlbum: AlbumDocument | null = await this.albumModel.findOne({isDefault: true, artist: new Types.ObjectId(userId)})
 
        if(!defaultAlbum){
             console.log('Creating default album My songs');
-            await this.albumModel.create([{
+            await this.albumModel.create({
                 title: 'My songs',
                 artist: new Types.ObjectId(userId),
                 releasedYear: new Date().getFullYear(),
                 songs: [],
                 isDefault: true
-            }], {session})
+            })
        }
     }
 
