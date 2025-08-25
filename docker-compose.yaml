@@ -1,7 +1,6 @@
 name: music-streamer-app
 
 services:
-
   frontend:
     build:
       context: ./frontend
@@ -17,23 +16,75 @@ services:
     env_file:
       - ./backend/.env
     depends_on:
-      - mongo
+      - mongod1
 
-  mongo:
+  
+# mongodb replicaset primary
+  mongod1:
+    container_name: mongod1
     image: mongo
-    restart: always
-    ports:
-      - 27017:27017
     env_file:
       - ./backend/.env
+    ports:
+      - 27017:27017
     volumes:
-      - ./db/mongoDB:/data/db
+      - ./db/mongoDB1:/data/db #the data are saved locally in backend file directory db/mongoDB
+      - mongo-keyfile:/etc/mongo-keyfile
+    depends_on:
+      - mongod2
+      - mongod3
+    restart: always
+    command: ["--replSet", "dbrs", "--bind_ip_all", "--keyFile", "/etc/mongo-keyfile/mongodb-keyfile"]
+
+  # mongodb replicaset secondary
+  mongod2:
+    container_name: mongod2
+    image: mongo
+    expose:
+      - 27017
+    volumes:
+      - ./db/mongoDB2:/data/db 
+      - mongo-keyfile:/etc/mongo-keyfile
+    restart: always
+    command: ["--replSet", "dbrs", "--bind_ip_all", "--keyFile", "/etc/mongo-keyfile/mongodb-keyfile"]
+
+  # mongodb replicaset arbiter
+  mongod3:
+    container_name: mongod3
+    image: mongo
+    expose:
+      - 27017
+    volumes:
+      - ./db/mongoDB3:/data/db 
+      - mongo-keyfile:/etc/mongo-keyfile
+    restart: always
+    command: ["--replSet", "dbrs", "--bind_ip_all", "--keyFile", "/etc/mongo-keyfile/mongodb-keyfile"]
+  
+  mongo-setup:
+    image: mongo
+    container_name: mongo-setup
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - mongod1
+      - mongod2
+      - mongod3
+    volumes:
+      - ./backend/scripts/mongodb_rs_init.sh:/scripts/mongodb_rs_init.sh
+      - mongo-keyfile:/etc/mongo-keyfile
+    restart: on-failure
+    entrypoint: ["/bin/bash", "/scripts/mongodb_rs_init.sh"]
 
   mongo-express:
+    container_name: mongo-express
     image: mongo-express
+    env_file:
+      - ./backend/.env
     restart: always
     ports:
       - 8081:8081
-    env_file:
-      - ./backend/.env
+    depends_on:
+      - "mongod1"
   
+volumes:
+  mongo-keyfile:

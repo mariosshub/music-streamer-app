@@ -11,6 +11,7 @@ import { UploadSongFieldsDTO } from "./dto/upload-song-fields.dto";
 import { SocketService } from "src/socket/socket.service";
 import { GridFSBucket } from 'mongodb';
 import { MulterMusicFile } from "./multer/multer-file.types";
+import { ClientSession } from "mongoose";
 
 @Injectable()
 export class SongsService {
@@ -129,7 +130,7 @@ export class SongsService {
         let uploadedFile = await this.uploadFile(file)
         
         if(!uploadedFile){
-            throw new HttpException('No album provided', HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new HttpException('Error uploading music file', HttpStatus.INTERNAL_SERVER_ERROR);
         }
         console.log('file uploaded with id = ', uploadedFile.id)
 
@@ -143,25 +144,36 @@ export class SongsService {
             throw new HttpException('Song with same title found!', HttpStatus.INTERNAL_SERVER_ERROR);
 
         let albumToInsertSong = await this.albumsService.getUsersAlbum(album, userId);
-    
-        const createSongDto: CreateSongDTO = {
-            artist: new Types.ObjectId(userId),
-            title: title,
-            releasedDate: releasedDate,
-            uploadDate: new Date().toISOString(),
-            durationInSec: parseInt(durationInSec),
-            genre: genre,
-            uploadedSongId: uploadedFile.id,
-            album: albumToInsertSong._id
+
+        const session = await this.connection.startSession();
+        try {
+            session.startTransaction();
+
+            const createSongDto: CreateSongDTO = {
+                artist: new Types.ObjectId(userId),
+                title: title,
+                releasedDate: releasedDate,
+                uploadDate: new Date().toISOString(),
+                durationInSec: parseInt(durationInSec),
+                genre: genre,
+                uploadedSongId: uploadedFile.id,
+                album: albumToInsertSong._id
+            }
+            let songDocument = await this.songModel.create(createSongDto);
+
+            // set the song to album -> songs
+            await this.albumsService.updateSongsArray(albumToInsertSong, songDocument._id, session)
+
+            await session.commitTransaction();
+            // return the recently uploaded song with socket
+            this.socketService.socket.emit('recently_uploaded', songDocument)
+            return songDocument;
+        } catch (error) {
+            await session.abortTransaction();
+            throw error
+        } finally {
+            session.endSession()
         }
-        let songDocument = await this.songModel.create(createSongDto);
-
-        // set the song to album -> songs
-        await this.albumsService.updateSongsArray(albumToInsertSong, songDocument._id)
-
-        // return the recently uploaded song with socket
-        this.socketService.socket.emit('recently_uploaded', songDocument)
-        return songDocument;
     }
 
     // updates songs released date, genre and album
@@ -171,42 +183,53 @@ export class SongsService {
             artist: new Types.ObjectId(userId)
         }).orFail(() => new HttpException("Could not find song to update", HttpStatus.NOT_FOUND));
 
-        //check if album exists
+        // check if album exists
         let albumToInsertSong = await this.albumsService.getUsersAlbum(updateSongDto.album, userId);
 
-        // here its best to use transactions and rollbacks but we dont have replica sets in local mongo (maybe for feature improvement)
-
-        //check if its a different album from the one that was in
+        // check if its a different album from the one that was in
         // in order to remove from the one and add to the other
         if(songToUpdate.album.toString() !== albumToInsertSong._id.toString()){
-            // update the album insert the updatedsong to songs array
-            await this.albumsService.updateSongsArray(albumToInsertSong, songToUpdate._id)
+            // using transactions if delete oparation fails to revert update changes
+            const session = await this.connection.startSession();
+            try {
+                session.startTransaction();
+                // update the album insert the updatedsong to songs array
+                await this.albumsService.updateSongsArray(albumToInsertSong, songToUpdate._id, session)
 
-            //remove the song from previous album
-            await this.albumsService.deleteAlbumsSong(songToUpdate._id.toString(), songToUpdate.album)
-            // update the album finally
-            songToUpdate.album = albumToInsertSong._id;
+                // remove the song from previous album
+                await this.albumsService.deleteAlbumsSong(songToUpdate._id.toString(), songToUpdate.album, session)
+                await session.commitTransaction();
+                // update the album finally
+                songToUpdate.album = albumToInsertSong._id;
+            } catch (error) {
+                await session.abortTransaction();
+                throw error
+            } finally {
+                session.endSession();
+            }
         }
-
         songToUpdate.releasedDate = updateSongDto.releasedDate;
         songToUpdate.genre = updateSongDto.genre;
 
         return await songToUpdate.save();
     }
 
-    async updateSongComments(songId: string, commentId: Types.ObjectId) {
+    async updateSongComments(songId: string, commentId: Types.ObjectId, session: ClientSession) {
         return await this.songModel.updateOne(
             {_id: new Types.ObjectId(songId)},
-            {$push: {comments: commentId}}
-        )
+            {$push: {comments: commentId}},
+            {session}
+        ).orFail(new HttpException("No song found to update comments", HttpStatus.NOT_FOUND))
     }
 
-    async increaseSongVotes(songId: string) {
-        return await this.songModel.findByIdAndUpdate(new Types.ObjectId(songId), {$inc: {votes: 1}})
+    async increaseSongVotes(songId: string, session: ClientSession) {
+        return await this.songModel.findByIdAndUpdate(new Types.ObjectId(songId), {$inc: {votes: 1}}, {session})
+            .orFail(new HttpException("No song found to increase song votes", HttpStatus.NOT_FOUND))
     }
 
-    async decreaseSongVotes(songId: string) {
-        return await this.songModel.findByIdAndUpdate(new Types.ObjectId(songId), {$inc: {votes: -1}})
+    async decreaseSongVotes(songId: string, session: ClientSession) {
+        return await this.songModel.findByIdAndUpdate(new Types.ObjectId(songId), {$inc: {votes: -1}}, {session})
+            .orFail(new HttpException("No song found to decrease song votes", HttpStatus.NOT_FOUND))
     }
 
     async deleteSong(songId: string, userId: string) {
@@ -214,18 +237,31 @@ export class SongsService {
         let song = await this.songModel.findOne({_id: new Types.ObjectId(songId), artist: new Types.ObjectId(userId)})
             .orFail(() => new HttpException("Could not find song", HttpStatus.NOT_FOUND));
         let uploadedSongId = song.uploadedSongId;
-        
-        // here tried to use transactions and rollbacks but we dont have replica sets (maybe for feature improvement)
 
-        // pull song from the album
-        const albumsUpdateResult = await this.albumsService.deleteAlbumsSong(songId, song.album);
+        const session = await this.connection.startSession();
+        try {
+            session.startTransaction();
+            // pull song from the album
+            const albumsUpdateResult = await this.albumsService.deleteAlbumsSong(songId, song.album, session);
 
-        console.log("Deleted song from album: ", albumsUpdateResult.modifiedCount);
+            console.log("Deleted song from album: ", albumsUpdateResult.modifiedCount);
 
-        // delete the song document
-        await this.songModel.deleteOne({_id: new Types.ObjectId(songId)})
+            // delete the song document
+            let deleteResult = await this.songModel.deleteOne({_id: new Types.ObjectId(songId)}, {session})
 
-        // delete from bucket
+            if(deleteResult.deletedCount === 0) {
+                throw new HttpException('There was an error deleting the song', HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+
+            await session.commitTransaction();
+        } catch (error) {
+            await session.abortTransaction();
+            throw error
+        } finally {
+            session.endSession();
+        }
+
+        // delete from bucket (bucket.delete doesn't implement sessions.. )
         try {
             await this.bucket.delete(uploadedSongId);
         } catch (error) {
@@ -233,11 +269,16 @@ export class SongsService {
         }
     }
 
-    async deleteMultipleSongs(songArray: SongDocument[], userId:string) {
+    async deleteMultipleSongs(songArray: SongDocument[], session: ClientSession) {
         if(songArray.length == 0)
             return
+        
         let songIdsToDelete = songArray.map(song => song._id);
-        await this.songModel.deleteMany({_id: { $in: songIdsToDelete}});
+        
+        let result = await this.songModel.deleteMany({_id: { $in: songIdsToDelete}}, {session});
+
+        if(result.deletedCount !== songArray.length)
+            throw new HttpException("There was an error deleting all songs", HttpStatus.NOT_FOUND);
 
         const promiseArr: Promise<void>[] = []
 
