@@ -4,7 +4,6 @@ import { Album, AlbumDocument } from "./schemas/album";
 import { ClientSession, Connection, Model, Types } from "mongoose";
 import { CreateAlbumDTO } from "./dto/create-album.dto";
 import { Song, SongDocument } from "src/songs/schemas/song";
-import { UpdateAlbumSongsDTO } from "./dto/update-album-songs.dto";
 import { User } from "src/users/schemas/user";
 import { RenameAlbumDTO } from "./dto/rename-album.dto";
 import { SongsService } from "../songs/songs.service";
@@ -49,18 +48,18 @@ export class AlbumsService {
     }
 
     // create a default album when user signs in if not exists
-    async createDefaultAlbum (userId: string): Promise<void> {
-       let defaultAlbum: AlbumDocument | null = await this.albumModel.findOne({isDefault: true, artist: new Types.ObjectId(userId)})
+    async createDefaultAlbum (userId: string, session: ClientSession): Promise<void> {
+       let defaultAlbum = await this.albumModel.findOne({isDefault: true, artist: new Types.ObjectId(userId)},null, {session})
 
        if(!defaultAlbum){
             console.log('Creating default album My songs');
-            await this.albumModel.create({
+            await this.albumModel.create([{
                 title: 'My songs',
                 artist: new Types.ObjectId(userId),
                 releasedYear: new Date().getFullYear(),
                 songs: [],
                 isDefault: true
-            })
+            }], {session})
        }
     }
 

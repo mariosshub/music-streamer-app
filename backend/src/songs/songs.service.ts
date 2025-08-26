@@ -159,10 +159,11 @@ export class SongsService {
                 uploadedSongId: uploadedFile.id,
                 album: albumToInsertSong._id
             }
-            let songDocument = await this.songModel.create(createSongDto);
+
+            let songDocument = await this.songModel.create([createSongDto], {session});
 
             // set the song to album -> songs
-            await this.albumsService.updateSongsArray(albumToInsertSong, songDocument._id, session)
+            await this.albumsService.updateSongsArray(albumToInsertSong, songDocument[0]._id, session)
 
             await session.commitTransaction();
             // return the recently uploaded song with socket

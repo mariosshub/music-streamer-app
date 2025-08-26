@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { User, UserDocument } from "./schemas/user";
-import { Model, Types } from "mongoose";
+import { ClientSession, Model, Types } from "mongoose";
 import { CreateUserDTO } from "./dto/create-user.dto";
 
 @Injectable()
@@ -30,11 +30,17 @@ export class UsersService {
             .orFail(() => new HttpException("User not found", HttpStatus.NOT_FOUND));
     }
 
-    async create(userDto: CreateUserDTO) : Promise<UserDocument> {
-        return await this.userModel.create(userDto);
+    async create(userDto: CreateUserDTO, session: ClientSession) : Promise<UserDocument[]> {
+        return await this.userModel.create([userDto], {session});
     }
 
     async updateRefreshToken(userId: Types.ObjectId, refreshToken: string | null){
-        const user = await this.userModel.updateOne({_id:userId}, {refreshToken: refreshToken})
+        return await this.userModel.updateOne({_id:userId}, {refreshToken: refreshToken})
+        .orFail(() => new HttpException("User not found", HttpStatus.NOT_FOUND));
+    }
+
+    async updateRefreshTokenWithSession(userId: Types.ObjectId, refreshToken: string | null, session: ClientSession){
+        return await this.userModel.updateOne({_id:userId}, {refreshToken: refreshToken}, {session})
+            .orFail(() => new HttpException("User not found", HttpStatus.NOT_FOUND));
     }
 }
